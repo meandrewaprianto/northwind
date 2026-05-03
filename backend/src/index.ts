@@ -16,7 +16,7 @@ app.post("/webhooks/clerk", rawJson, (req, res) => {
 });
 
 app.use(express.json());
-app.use(cors());
+app.use(cors({ origin: env.FRONTEND_URL }));
 app.use(clerkMiddleware());
 
 app.listen(env.PORT, () => console.log("Listening on port:", env.PORT));

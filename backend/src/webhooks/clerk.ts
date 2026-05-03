@@ -5,9 +5,12 @@ import { parseRole } from "../lib/roles";
 import { db } from "../db";
 import { users } from "../db/schema";
 import { eq } from "drizzle-orm";
+import { error } from "node:console";
 
 export async function clerkWebhookHandler(req: Request, res: Response) {
   const env = getEnv();
+
+  let evt: Awaited<ReturnType<typeof verifyWebhook>>;
 
   try {
     if (!env.CLERK_WEBHOOK_SECRET) {
@@ -26,10 +29,16 @@ export async function clerkWebhookHandler(req: Request, res: Response) {
     });
 
     // throws if signature is wrong or body was tampered with; only then we trust evt
-    const evt = await verifyWebhook(request, {
+    evt = await verifyWebhook(request, {
       signingSecret: env.CLERK_WEBHOOK_SECRET,
     });
+  } catch {
+    console.error("Clerk webhook signature verification failed", error);
+    res.status(400).json({ error: "Invalid Webhook" });
+    return;
+  }
 
+  try {
     if (evt.type === "user.created" || evt.type === "user.updated") {
       const u = evt.data;
 
@@ -67,8 +76,7 @@ export async function clerkWebhookHandler(req: Request, res: Response) {
 
     res.json({ ok: true });
   } catch (error) {
-    // Bad signature, malformed payload, or DB Error - do not leak details to the client
     console.error("Clerk webhook error", error);
-    res.status(400).json({ error: "Invalid Webhook" });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 }
